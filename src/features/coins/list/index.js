@@ -1,12 +1,19 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { ErrorBoundary, useErrorHandler } from "react-error-boundary";
 import { Link } from "react-router-dom";
+import { useSelector, useDispatch } from "react-redux";
 
 import { ErrorFallback, Loader } from "../../../common/core";
 import { STATUS } from "../../../common/constants";
 import { logError } from "../../../common/utils";
 
 import { list } from "../coins.service.js";
+import {
+  coinsReset, // action
+  fetchCoins, // thunk
+  selectAllCoins, // selector
+  selectFetchCoinsStatus, // selector
+} from "../coins.slice";
 
 import {
   container,
@@ -20,26 +27,20 @@ import {
 } from "./list.module.css";
 
 export default function CoinsList() {
-  const [coins, setCoins] = useState([]);
-  const [status, setStatus] = useState(STATUS.idle);
+  const coins = useSelector(selectAllCoins);
+  const status = useSelector(selectFetchCoinsStatus);
+  const dispatch = useDispatch();
   const handleError = useErrorHandler();
 
   useEffect(() => {
     const abortController = new AbortController();
     async function loadCoins() {
-      if (status === STATUS.idle) {
-        try {
-          setStatus(STATUS.loading);
-          setCoins(await list(abortController.signal));
-        } catch ({ message }) {
-          handleError(
-            new Error(
-              `Sorry, we're having trouble loading the coins: ${message}`
-            )
-          );
-        } finally {
-          setStatus(STATUS.idle);
-        }
+      try {
+        await dispatch(fetchCoins(abortController.signal)).unwrap();
+      } catch ({ message }) {
+        handleError(
+          new Error(`Sorry, we're having trouble loading the coins: ${message}`)
+        );
       }
     }
     loadCoins();
@@ -105,8 +106,7 @@ export default function CoinsList() {
         children={coinsTable}
         FallbackComponent={ErrorFallback}
         onReset={() => {
-          setCoins([]);
-          setStatus(STATUS.idle);
+          dispatch(coinsReset());
         }}
         onError={logError}
       />
